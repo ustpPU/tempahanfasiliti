@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="google" content="notranslate"> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>PKGPU Booking</title>
+    
+    <link rel="icon" type="image/png" href="https://i.ibb.co/fYY58Rh2/JATA-NEGARA-PNG.png">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght=400;600;800&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background: #0f172a; /* TUKAR KEPADA OBSIDIAN DARK BLUE/SLATE */
+            color: #1e293b; 
+            overflow-x: hidden; 
+        }
+        .premium-card { 
+            background: white; 
+            border: 1px solid #e2e8f0; 
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.3); /* Shadow bawah kad lebih gelap sikit */
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1); 
+            cursor: pointer; 
+        }
+        .premium-card:hover { 
+            transform: translateY(-8px); 
+            box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.5); 
+        }
+        
+        /* 🌟 AMANAH GLASS EFFECT (DIBETULKAN UNTUK MENGALANG SKRIN KEDIP) */
+        #side-sheet { 
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1); 
+            transform: translateX(100%); 
+            background: rgba(255, 255, 255, 0.4); 
+            border-left: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: -10px 0 30px -5px rgba(0, 0, 0, 0.2);
+            
+            /* Menggunakan isolate untuk elak gangguan filter ke borang */
+            isolation: isolate; 
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+        }
+
+        /* 🚀 FIX COCOK KHUSUS: Selesaikan blinking hitam pada Kalendar & Dropdown Borang */
+        #sec-form input, 
+        #sec-form select, 
+        #sec-form button, 
+        #sec-form {
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            -webkit-transform: translate3d(0, 0, 0);
+            transform: translate3d(0, 0, 0);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* ✨ OPTIMASI KALENDAR */
+        input[type="date"] {
+            -webkit-appearance: none;
+            position: relative;
+            will-change: transform;
+        }
+
+        /* Memastikan ikon kalendar asal browser tidak mengganggu susunan lapisan (z-index) */
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* 📱 SEKAT EFFECT BLUR DI MOBILE APABILA BORANG DIBUKA (Punca utama Blinking) */
+        @media (max-width: 1024px) {
+            #side-sheet {
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+                background: rgba(255, 255, 255, 0.95); /* Tukar jadi solid putih lembut di phone */
+            }
+        }
+        @media (min-width: 1025px) {
+            #side-sheet {
+                backdrop-filter: blur(24px);
+                -webkit-backdrop-filter: blur(24px);
+            }
+        }
+
+        #side-sheet.open { transform: translateX(0); }
+        .item-active .detail-content { max-height: 300px; opacity: 1; padding-top: 1rem; margin-top: 1rem; border-top: 1px dashed #e2e8f0; }
+        .detail-content { max-height: 0; overflow: hidden; transition: all 0.4s ease; opacity: 0; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .pulse-green { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } }
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #4f46e5; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .slot-pill.selected { background: #4f46e5 !important; color: white !important; border-color: #4f46e5 !important; }
+
+        /* ✨ DIUBAH: Kesan Fade Smooth Premium Global Antara Menu */
+        .fade-menu {
+            transition: opacity 0.4s ease-in-out, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            opacity: 0;
+            transform: translateY(12px);
+        }
+        .fade-menu.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+</style>
+</head>
+<body>
+
+    <div id="landing-page-spinner" class="fixed inset-0 bg-slate-950 z-[9999] flex flex-col items-center justify-center p-4 transition-all duration-500">
+    <div class="animate-spin rounded-full h-14 w-14 border-4 border-slate-800 border-t-indigo-500 shrink-0"></div>
+    
+    <h3 class="text-white font-semibold text-base sm:text-lg mt-6 tracking-wide text-center px-4 leading-relaxed">
+        Unit Sumber Teknologi Pendidikan PPDPU
+    </h3>
+    
+    <p class="text-slate-400 text-xs sm:text-sm mt-2 animate-pulse text-center px-4">
+        Loading Smart Facilities Booking System...
+    </p>
+</div>
+
+<div id="loading-overlay" class="hidden fixed inset-0 bg-white/90 z-[200] flex flex-col items-center justify-center">
+        <div class="loader mb-4"></div>
+        <p class="font-bold text-amber-500 animate-pulse">Sedang memproses...</p>
+    </div>
+
+    <div id="overlay" class="hidden fixed inset-0 shadow-slate-900/40 z-[100] backdrop-blur-sm" onclick="closeSheet()"></div>
+
+    <div id="side-sheet" class="fixed top-0 right-0 h-full w-full max-w-lg bg-white z-[110] shadow-2xl p-8 overflow-y-auto">
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h2 id="sheet-title" class="text-lg sm:text-2xl font-black text-slate-800 whitespace-nowrap">Senarai Tempahan</h2>
+                <p id="sheet-subtitle" class="text-amber-500 text-sm font-bold mt-1 uppercase tracking-widest"></p>
+            </div>
+            <button onclick="closeSheet()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 text-slate-400">✕</button>
+        </div>
+        <div id="sheet-content" class="space-y-4"></div>
+    </div>
+
+    <nav class="sticky top-0 z-[50] bg-slate-950/60 backdrop-blur-lg border-b border-white/[0.03] py-4 px-4 sm:px-8 flex justify-between items-center gap-2 shadow-xl shadow-black/10">
+    <div class="flex items-center gap-2 sm:gap-3 cursor-pointer shrink-0" onclick="showLanding()">
+        <div class="w-9 h-9 sm:w-11 sm:h-11 bg-white rounded-xl flex items-center justify-center p-1 sm:p-1.5 shadow-md shadow-black/20 shrink-0">
+            <img src="https://i.ibb.co/fYY58Rh2/JATA-NEGARA-PNG.png" alt="Jata Negara" class="w-full h-full object-contain">
+        </div>
+        <h1 class="text-base sm:text-xl font-bold tracking-tight text-white whitespace-nowrap">
+            PKGPU <span class="text-amber-500 font-bold">Booking</span>
+        </h1>
+    </div>
+    <button id="btn-toggle-view" onclick="showCheck()" class="bg-white text-slate-900 text-[10px] sm:text-xs font-bold px-3 py-2 sm:px-6 sm:py-3 rounded-xl sm:rounded-2xl shadow-xl hover:bg-slate-100 transition-colors shrink-0">Semak Tempahan</button>
+</nav>
+
+    <main class="max-w-6xl mx-auto p-8 pb-24">
+        
+        <section id="sec-landing" class="space-y-8 sm:space-y-12 fade-menu show">
+            <div class="max-w-xl">
+                <!-- 🛠️ DIUBAH: text-2xl di mobile, naik ke sm:text-4xl di desktop -->
+                <h2 class="text-2xl sm:text-4xl font-bold text-white leading-tight">
+                    Tempahan <span class="text-amber-500 italic">Fasiliti PKG.</span>
+                </h2>
+                <!-- 🛠️ DIUBAH: Kecilkan sikit teks penerangan di mobile (text-xs) supaya lebih 'clean' -->
+                <p class="text-slate-400 text-xs sm:text-sm mt-2 sm:mt-4 italic leading-relaxed">
+                    Sila pilih dari senarai fasiliti di bawah untuk memulakan tempahan baru.
+                </p>
+            </div>
+            <div id="gallery-container" class="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8"></div>
+        </section>
+
+        <section id="sec-check" class="hidden space-y-8 sm:space-y-12 animate-in fade-in duration-500">
+            <div class="max-w-xl">
+                <!-- 🛠️ DIUBAH: text-2xl di mobile, naik ke sm:text-4xl di desktop -->
+                <h2 class="text-2xl sm:text-4xl font-extrabold text-white italic leading-tight">
+                    Senarai <span class="text-amber-500">Tempahan.</span>
+                </h2>
+                <p class="text-slate-400 text-xs sm:text-sm mt-2 sm:mt-4 leading-relaxed">
+                    Klik pada fasiliti untuk menyemak butiran tempahan terperinci.
+                </p>
+            </div>
+            <div id="hub-container" class="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8"></div>
+        </section>
+
+        <section id="sec-form" class="hidden max-w-5xl mx-auto animate-in slide-in-from-bottom-8 duration-500 px-2 sm:px-0">
+            <div class="bg-white rounded-3xl sm:rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden flex flex-col lg:flex-row">
+                
+                <div class="p-5 sm:p-8 lg:p-10 lg:w-1/2 space-y-4 sm:space-y-6">
+                    <button onclick="showLanding()" class="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-900 hover:text-black font-extrabold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-md hover:shadow-lg active:scale-95 transition-all duration-200">
+                        ✕ Tutup Borang
+                    </button>
+                    
+                    <h2 id="display-fasiliti" class="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight leading-tight"></h2>
+                    
+                    <div class="space-y-3 sm:space-y-4 text-sm">
+                        <input type="text" id="nama_program" placeholder="Nama Program / Mesyuarat" class="w-full border p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500 transition-all">
+                        <input type="text" id="nama_pemohon" placeholder="Nama Penuh Pemohon" class="w-full border p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500 transition-all">
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                            <input type="text" id="no_hp" placeholder="No. Telefon (WhatsApp)" class="border p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500">
+                            <input type="email" id="email_pemohon" placeholder="Alamat Emel" class="border p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500">
+                        </div>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                            <select id="select-sektor" class="border p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500"></select>
+                            <select id="select-organisasi" class="border p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500"></select>
+                        </div>
+                        
+                        <select id="select-tujuan" class="w-full border p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500"></select>
+                        <input type="number" id="bil_peserta" placeholder="Bilangan Peserta" class="w-full border p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                </div>
+                
+                <div class="bg-slate-100 p-5 sm:p-8 lg:p-10 lg:w-1/2 border-t lg:border-t-0 lg:border-l border-slate-200/60 flex flex-col justify-between gap-6">
+                    <div>
+                        <p class="font-bold text-slate-800 mb-3 sm:mb-4 text-sm sm:text-base">Pilih Tarikh & Slot Masa:</p>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
+                            <div class="flex flex-col gap-1.5">
+                                <label for="t_mula" class="text-xs font-bold text-slate-600 px-1">Tarikh Mula</label>
+                                <input type="date" id="t_mula" onchange="generateMatrix()" class="w-full border p-3.5 sm:p-4 rounded-xl sm:rounded-2xl outline-none focus:ring-2 focus:ring-emerald-600 text-sm text-slate-900 bg-white">
+                            </div>
+
+                            <div class="flex flex-col gap-1.5">
+                                <label for="t_akhir" class="text-xs font-bold text-slate-600 px-1">Tarikh Tamat</label>
+                                <input type="date" id="t_akhir" onchange="generateMatrix()" class="w-full border p-3.5 sm:p-4 rounded-xl sm:rounded-2xl outline-none focus:ring-2 focus:ring-emerald-600 text-sm text-slate-900 bg-white">
+                            </div>
+                        </div>
+                        
+                        <div id="slot-matrix-container" class="space-y-3 max-h-[280px] sm:max-h-[400px] overflow-y-auto pr-1 custom-scroll">
+                            <p class="text-slate-400 italic text-xs sm:text-sm text-center py-10">Sila pilih tarikh mula dan akhir untuk melihat slot.</p>
+                        </div>
+                    </div>
+                    
+                    <button onclick="submitBooking()" class="w-full bg-emerald-600 hover:bg-emerald-700 shadow-slate-900/40 text-white py-4 sm:py-5 rounded-2xl sm:rounded-[2rem] font-bold text-base sm:text-lg shadow-2xl shadow-emerald-200 mt-4 lg:mt-8 active:scale-[0.98] transition-all">
+                        HANTAR TEMPAHAN
+                    </button>
+                </div>
+
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwlxARj5tmtZzGECp7E356LP96b1ZZP6yHss0Qshf_KcpgIC_3jAmfxJg3xOAXUvg0yiA/exec";
+        let appData = {}, allBookings = [], userSelections = {};
+
+        window.onload = async () => {
+            try {
+                const [resApp, resBook] = await Promise.all([
+                    fetch(WEB_APP_URL + "?action=getAppData"),
+                    fetch(WEB_APP_URL + "?action=getTempahan")
+                ]);
+                appData = await resApp.json();
+                allBookings = await resBook.json();
+                renderLanding();
+                
+                // 1. SET PLACEHOLDER DULU SECARA LIVE (Tukar warna text jadi kelabu slate-400)
+                const selectSektor = document.getElementById('select-sektor');
+                const selectOrganisasi = document.getElementById('select-organisasi');
+                const selectTujuan = document.getElementById('select-tujuan');
+
+                selectSektor.innerHTML = `<option value="" selected disabled hidden>Pilih Sektor</option>`;
+                selectOrganisasi.innerHTML = `<option value="" selected disabled hidden>Pilih Organisasi</option>`;
+                selectTujuan.innerHTML = `<option value="" selected disabled hidden>Pilih Tujuan Tempahan</option>`;
+                
+                selectSektor.classList.add('text-slate-400');
+                selectOrganisasi.classList.add('text-slate-400');
+                selectTujuan.classList.add('text-slate-400');
+
+                // Tambah fungsi tukar warna tulisan jadi hitam bila user dah pilih option
+                [selectSektor, selectOrganisasi, selectTujuan].forEach(dropdown => {
+                    dropdown.onchange = () => {
+                        dropdown.classList.remove('text-slate-400');
+                        dropdown.classList.add('text-slate-800');
+                    };
+                });
+
+                // 2. BARULAH MASUKKAN LIST DATA DARI GOOGLE SHEET (Guna +=)
+                appData.sektor.forEach(s => selectSektor.innerHTML += `<option class="text-slate-800">${s}</option>`);
+                appData.organisasi.forEach(o => selectOrganisasi.innerHTML += `<option class="text-slate-800">${o}</option>`);
+                appData.tujuan.forEach(t => selectTujuan.innerHTML += `<option class="text-slate-800">${t}</option>`);
+
+            } catch (e) { console.log(e); }
+        };
+
+    function renderLanding() {
+            const container = document.getElementById('gallery-container');
+            if (!container || !appData || !appData.fasilitiList) return;
+
+            container.innerHTML = appData.fasilitiList.map(f => {
+                const gambarBersih = f.gambar ? f.gambar.replace('.avif', '.jpg') : '';
+                return `
+                    <div onclick="startBooking('${f.nama}')" class="premium-card h-[230px] rounded-[2.5rem] overflow-hidden relative group border border-white/5 shadow-2xl bg-slate-900 cursor-pointer">
+                        <div class="absolute inset-0 z-0 bg-slate-900">
+                            ${gambarBersih ? `<img src="${gambarBersih}" alt="${f.nama}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" onerror="this.src='${f.gambar}'">` : ''}
+                        </div>
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-black/20 z-10"></div>
+                        <div class="absolute inset-0 p-6 flex flex-col justify-end z-20"> 
+                            <div class="space-y-2"> 
+                                <h3 class="text-xl font-semibold text-white tracking-tight leading-tight">${f.nama}</h3>
+                                <div class="flex items-center">
+                                    <span class="text-slate-300 text-[10px] font-semibold bg-white/10 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 shadow-sm flex items-center gap-1">
+                                        <span class="text-amber-500">👥</span> Kapasiti: ${f.kapasiti} orang
+                                    </span>
+                                </div>
+                                <div class="pt-1 text-amber-500 font-bold text-[10px] flex items-center gap-1 group-hover:text-amber-400 transition-colors tracking-wider uppercase">
+                                    Tempah Sekarang <span>→</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // 🌟 EFEK FADE OUT PREMIUM UNTUK SPINNER (BERFUNGSI PENUH)
+            const spinner = document.getElementById('landing-page-spinner');
+            if (spinner && !spinner.classList.contains('hidden')) {
+                spinner.classList.add('opacity-0', 'pointer-events-none');
+                
+                setTimeout(() => {
+                    spinner.classList.add('hidden');
+                }, 500);
+            }
+        }
+
+        function renderHub() {
+    const container = document.getElementById('hub-container');
+    if (!container || !appData || !appData.fasilitiList) return;
+
+    // 1. Fungsi Pembantu diletakkan di paling atas untuk elak Syntax/Reference Error
+    const formatKeDDMM = (tRaw) => {
+        if (!tRaw) return "";
+        if (tRaw instanceof Date) return tRaw.toLocaleDateString('ms-MY', {day:'2-digit', month:'2-digit'});
+        
+        let bersih = String(tRaw).split('T')[0];
+        if (bersih.includes('-')) { 
+            let p = bersih.split('-'); 
+            return `${p[2]}/${p[1]}`; 
+        }
+        if (bersih.includes('/')) { 
+            let p = bersih.split('/'); 
+            return p[2].length === 4 ? `${p[0]}/${p[1]}` : `${p[2]}/${p[1]}`; 
+        }
+        
+        let tObj = new Date(bersih); 
+        return isNaN(tObj.getTime()) ? "" : tObj.toLocaleDateString('ms-MY', {day:'2-digit', month:'2-digit'});
+    };
+
+    // Dapatkan tarikh hari ini (Set jam ke 00:00:00)
+    const kini = new Date();
+    const hariIni = new Date(kini.getFullYear(), kini.getMonth(), kini.getDate());
+
+    container.innerHTML = appData.fasilitiList.map(f => {
+        // 2. Tapis SEMUA tempahan hari ini & masa hadapan untuk fasiliti ini
+        const semuaUpcoming = typeof allBookings !== 'undefined' && allBookings
+            ? allBookings
+                .filter(b => {
+                    if (b.Fasiliti !== f.nama) return false;
+                    
+                    let tRaw = b.Tarikh_Mula;
+                    let tTempah;
+                    
+                    if (tRaw instanceof Date) {
+                        tTempah = new Date(tRaw.getFullYear(), tRaw.getMonth(), tRaw.getDate());
+                    } else {
+                        let bersih = String(tRaw).split('T')[0];
+                        if (bersih.includes('-')) {
+                            let p = bersih.split('-');
+                            tTempah = new Date(p[0], p[1] - 1, p[2]);
+                        } else if (bersih.includes('/')) {
+                            let p = bersih.split('/');
+                            tTempah = p[2].length === 4 ? new Date(p[2], p[1] - 1, p[0]) : new Date(p[0], p[1] - 1, p[2]);
+                        } else {
+                            let tObj = new Date(bersih);
+                            tTempah = new Date(tObj.getFullYear(), tObj.getMonth(), tObj.getDate());
+                        }
+                    }
+
+                    if (!tTempah || isNaN(tTempah.getTime())) return false;
+                    tTempah.setHours(0, 0, 0, 0);
+
+                    return tTempah >= hariIni;
+                })
+                .sort((a, b) => {
+                    const parseDate = (val) => {
+                        if (val instanceof Date) return val.getTime();
+                        let bersih = String(val).split('T')[0];
+                        if (bersih.includes('-')) { let p = bersih.split('-'); return new Date(p[0], p[1]-1, p[2]).getTime(); }
+                        if (bersih.includes('/')) { let p = bersih.split('/'); return p[2].length === 4 ? new Date(p[2], p[1]-1, p[0]).getTime() : new Date(p[0], p[1]-1, p[2]).getTime(); }
+                        return new Date(bersih).getTime();
+                    };
+                    return parseDate(a.Tarikh_Mula) - parseDate(b.Tarikh_Mula);
+                })
+            : [];
+
+        // 3. Semak secara spesifik sama ada ada tempahan betul-betul HARI INI
+        const adaHariIni = semuaUpcoming.find(b => {
+            let tRaw = b.Tarikh_Mula;
+            let tTempah;
+            if (tRaw instanceof Date) {
+                tTempah = new Date(tRaw.getFullYear(), tRaw.getMonth(), tRaw.getDate());
+            } else {
+                let bersih = String(tRaw).split('T')[0];
+                if (bersih.includes('-')) { let p = bersih.split('-'); tTempah = new Date(p[0], p[1] - 1, p[2]); }
+                else if (bersih.includes('/')) { let p = bersih.split('/'); tTempah = p[2].length === 4 ? new Date(p[2], p[1] - 1, p[0]) : new Date(p[0], p[1] - 1, p[2]); }
+                else { let tObj = new Date(bersih); tTempah = new Date(tObj.getFullYear(), tObj.getMonth(), tObj.getDate()); }
+            }
+            tTempah.setHours(0, 0, 0, 0);
+            return tTempah.getTime() === hariIni.getTime();
+        });
+
+        let bahagianStatusHTML = "";
+
+        if (adaHariIni) {
+            // JIKA HARI INI ADA PROGRAM
+            bahagianStatusHTML = `
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="status-dot bg-amber-500 w-2 h-2 rounded-full inline-block animate-pulse"></span>
+                    <p class="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Hari Ini</p>
+                </div>
+                <p class="text-xs font-bold text-white line-clamp-1 leading-relaxed mb-0.5">${adaHariIni.Nama_Program}</p>
+                <p class="text-[10px] text-slate-400 font-medium">Sedang digunakan • ${adaHariIni.Slot || 'Sepenuh Hari'}</p>
+            `;
+        } else {
+            // JIKA HARI INI KOSONG (Status: Sedia Ditempah)
+            const senaraiDigabung = [];
+            
+            semuaUpcoming.forEach(b => {
+                const tarikhStr = formatKeDDMM(b.Tarikh_Mula);
+                const namaBersih = b.Nama_Program ? b.Nama_Program.trim() : "";
+                
+                if (!tarikhStr) return; // Abaikan jika tarikh tidak valid
+                
+                const wujud = senaraiDigabung.find(item => item.Nama_Program.trim() === namaBersih);
+                
+                if (wujud) {
+                    if (!wujud.tarikhList.includes(tarikhStr)) {
+                        wujud.tarikhList.push(tarikhStr);
+                    }
+                } else {
+                    senaraiDigabung.push({
+                        Nama_Program: namaBersih,
+                        tarikhList: [tarikhStr]
+                    });
+                }
+            });
+
+            const duaUpcomingTerdekat = senaraiDigabung.slice(0, 2);
+            
+            let listEventHTML = "";
+            if (duaUpcomingTerdekat.length > 0) {
+                listEventHTML = duaUpcomingTerdekat.map(item => {
+                    let paparanTarikh = "";
+                    
+                    if (item.tarikhList.length > 1) {
+                        let p1 = item.tarikhList[0].split('/'); 
+                        let p2 = item.tarikhList[item.tarikhList.length - 1].split('/'); 
+                        
+                        if (p1[1] === p2[1]) {
+                            paparanTarikh = `${p1[0]} & ${p2[0]}/${p2[1]}`;
+                        } else {
+                            paparanTarikh = `${item.tarikhList[0]} & ${item.tarikhList[item.tarikhList.length - 1]}`;
+                        }
+                    } else {
+                        paparanTarikh = item.tarikhList[0];
+                    }
+
+                    return `<p class="text-[10px] text-slate-300 font-medium truncate">• <span class="text-amber-400 font-bold">${paparanTarikh}</span> — ${item.Nama_Program}</p>`;
+                }).join('');
+            } else {
+                listEventHTML = `<p class="text-[10px] text-slate-400 italic">Tiada tempahan akan datang</p>`;
+            }
+
+            bahagianStatusHTML = `
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+                    <p class="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Sedia Ditempah</p>
+                </div>
+                <div class="space-y-0.5 mt-1.5 border-t border-white/10 pt-1.5">
+                    <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Akan Datang:</p>
+                    ${listEventHTML}
+                </div>
+            `;
+        }
+
+        const gambarBersih = f.gambar ? f.gambar.replace('.avif', '.jpg') : '';
+
+        return `
+            <div onclick="openSheet('${f.nama}')" class="premium-card h-[230px] rounded-[2.5rem] overflow-hidden relative group border border-white/5 shadow-2xl bg-slate-900 cursor-pointer">
+                <div class="absolute inset-0 z-0 bg-slate-900">
+                    ${gambarBersih ? `<img src="${gambarBersih}" alt="${f.nama}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" onerror="this.src='${f.gambar}'">` : ''}
+                </div>
+                <div class="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30 z-10"></div>
+                <div class="absolute inset-0 p-6 flex flex-col justify-between z-20">
+                    <div><h3 class="text-xl font-semibold text-white drop-shadow-md truncate tracking-tight">${f.nama}</h3></div>
+                    <div class="pt-3">
+                        ${bahagianStatusHTML}
+                    </div>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+        function resetBorangTempahan() {
+            // 1. Kosongkan semua input teks, emel, dan nombor
+            document.getElementById('nama_program').value = '';
+            document.getElementById('nama_pemohon').value = '';
+            document.getElementById('no_hp').value = '';
+            document.getElementById('email_pemohon').value = '';
+            document.getElementById('bil_peserta').value = '';
+            document.getElementById('t_mula').value = '';
+            document.getElementById('t_akhir').value = '';
+
+            // 2. Set semula semua dropdown (select) ke pilihan pertama (default)
+            document.getElementById('select-sektor').selectedIndex = 0;
+            document.getElementById('select-organisasi').selectedIndex = 0;
+            document.getElementById('select-tujuan').selectedIndex = 0;
+
+            // 3. Kembalikan ayat asal pada kotak senarai slot masa
+            const containerSlot = document.getElementById('slot-matrix-container');
+            if (containerSlot) {
+                containerSlot.innerHTML = '<p class="text-slate-400 italic text-xs sm:text-sm text-center py-10">Sila pilih tarikh mula dan akhir untuk melihat slot.</p>';
+            }
+        }
+
+        function generateMatrix() {
+            const startStr = document.getElementById('t_mula').value;
+            const endStr = document.getElementById('t_akhir').value || startStr;
+            const container = document.getElementById('slot-matrix-container');
+            const namaFasilitiSemasa = document.getElementById('display-fasiliti').innerText; 
+            
+            if (!startStr) return;
+            const start = new Date(startStr); const end = new Date(endStr);
+            container.innerHTML = ""; userSelections = {};
+            
+            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                let dateStr = d.toISOString().split('T')[0]; // Format YYYY-MM-DD
+                let formattedDateForCheck = d.toLocaleDateString('ms-MY', {day:'2-digit', month:'2-digit', year:'numeric'});
+
+                let row = document.createElement('div');
+                row.className = "bg-white p-5 rounded-2xl border border-slate-100 mb-3 shadow-sm";
+                row.innerHTML = `<p class="text-[10px] font-black text-amber-500 mb-3 uppercase tracking-tighter">${d.toLocaleDateString('ms-MY',{weekday:'long',day:'numeric',month:'short',year:'numeric'})}</p>`;
+                
+                let grid = document.createElement('div'); 
+                grid.className = "grid grid-cols-2 gap-2";
+                
+                ['Slot 1: 08:00 - 10:00', 'Slot 2: 10:00 - 12:00', 'Slot 3: 13:00 - 15:00', 'Slot 4: 15:00 - 17:00'].forEach(s => {
+                    let pill = document.createElement('div');
+                    
+                    let isAlreadyBooked = allBookings.some(b => {
+                        let checkDate = b.Tarikh_Mula;
+                        if (checkDate.includes('T')) {
+                            checkDate = new Date(checkDate).toLocaleDateString('ms-MY', {day:'2-digit', month:'2-digit', year:'numeric'});
+                        }
+                        return b.Fasiliti === namaFasilitiSemasa && checkDate === formattedDateForCheck && b.Slot === s;
+                    });
+
+                    if (isAlreadyBooked) {
+                        pill.className = "border p-3 rounded-xl text-center text-[11px] font-bold bg-red-50 text-red-500 border-red-200 cursor-not-allowed opacity-75";
+                        pill.innerText = `${s} (Telah Ditempah)`;
+                    } else {
+                        pill.className = "slot-pill border p-3 rounded-xl text-center text-[11px] font-bold cursor-pointer hover:bg-slate-50 transition-all border-slate-200 text-slate-700";
+                        pill.innerText = s;
+                        pill.onclick = () => {
+                            pill.classList.toggle('selected');
+                            if(!userSelections[dateStr]) userSelections[dateStr] = [];
+                            if(pill.classList.contains('selected')) userSelections[dateStr].push(s);
+                            else userSelections[dateStr] = userSelections[dateStr].filter(x => x !== s);
+                        };
+                    }
+                    grid.appendChild(pill);
+                });
+                row.appendChild(grid); 
+                container.appendChild(row);
+            }
+        }
+
+        async function submitBooking() {
+            const bookingItems = Object.keys(userSelections).map(date => ({ tarikh: date, slots: userSelections[date] })).filter(i => i.slots.length > 0);
+            if(bookingItems.length === 0) return alert("Pilih sekurang-kurangnya satu slot masa!");
+            
+            const emailInput = document.getElementById('email_pemohon').value.trim();
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            
+            if (!emailInput) {
+                return alert("Sila masukkan alamat emel anda!");
+            }
+            if (!emailRegex.test(emailInput)) {
+                return alert("Format emel tidak sah! Sila pastikan ada '@' dan sambungan domain (Contoh: nama@gmail.com atau user@moe-dl.edu.my)");
+            }
+
+            document.getElementById('loading-overlay').classList.remove('hidden');
+            const payload = {
+                fasiliti: document.getElementById('display-fasiliti').innerText,
+                nama_program: document.getElementById('nama_program').value,
+                nama_pemohon: document.getElementById('nama_pemohon').value,
+                no_hp: document.getElementById('no_hp').value,
+                email: emailInput,
+                sektor: document.getElementById('select-sektor').value,
+                organisasi: document.getElementById('select-organisasi').value,
+                tujuan: document.getElementById('select-tujuan').value,
+                bil_peserta: document.getElementById('bil_peserta').value,
+                tarikh_mula: document.getElementById('t_mula').value,
+                tarikh_akhir: document.getElementById('t_akhir').value || document.getElementById('t_mula').value,
+                bookingItems: bookingItems
+            };
+            try {
+                await fetch(WEB_APP_URL, { 
+                    method: 'POST', 
+                    mode: 'no-cors', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload) 
+                });
+                
+                const emelPemohon = document.getElementById('email_pemohon').value;
+
+                Swal.fire({
+                    title: 'Tempahan Berjaya!',
+                    html: `Permohonan anda telah direkodkan. Emel pengesahan telah pun dihantar ke <span style="color: #fbbf24; font-weight: bold;">${emelPemohon}</span>. Sila semak peti masuk (atau folder Spam) anda.`,
+                    icon: 'success',
+                    confirmButtonText: 'Selesai',
+                    confirmButtonColor: '#059669',
+                    background: '#ffffff',
+                    allowOutsideClick: false,
+                    customClass: {
+                        popup: 'rounded-[2rem]'
+                    }
+                }).then((result) => {
+                    location.reload();
+                });
+                
+            } catch (e) { 
+                Swal.fire({
+                    title: 'Ralat!',
+                    text: 'Penghantaran gagal. Sila cuba lagi.',
+                    icon: 'error',
+                    confirmButtonColor: '#ef4444'
+                });
+                document.getElementById('loading-overlay').classList.add('hidden'); 
+            }
+        }
+
+        // 📋 1. UPGRADE: FUNGSI UNTUK PAPAR CHECK (SEMAK TEMPAHAN) DENGAN SMOOTH FADE
+        function showCheck() {
+            const secLanding = document.getElementById('sec-landing');
+            const secCheck = document.getElementById('sec-check');
+            const secForm = document.getElementById('sec-form');
+            const btnToggle = document.getElementById('btn-toggle-view');
+
+            // Tetapkan teks dan atribut butang navigasi utama
+            if (btnToggle) {
+                btnToggle.innerText = "Tempah Fasiliti";
+                btnToggle.setAttribute("onclick", "showLanding()");
+            }
+
+            // Langkah A: Padam kelas '.show' untuk mulakan animasi fade-out
+            secLanding.classList.remove('show');
+            secForm.classList.remove('show');
+
+            // Langkah B: Tunggu animasi fade-out selesai (200ms), kemudian tukar paparan skrin
+            setTimeout(() => {
+                secLanding.classList.add('hidden');
+                secForm.classList.add('hidden');
+                
+                secCheck.classList.remove('hidden');
+                secCheck.classList.add('fade-menu');
+                
+                // Langkah C: Jalankan render data dan aktifkan fade-in
+                renderHub();
+                setTimeout(() => {
+                    secCheck.classList.add('show');
+                }, 50);
+            }, 200);
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // 🏠 2. UPGRADE: FUNGSI UNTUK PAPAR LANDING DENGAN SMOOTH FADE
+        function showLanding() {
+            const secLanding = document.getElementById('sec-landing');
+            const secCheck = document.getElementById('sec-check');
+            const secForm = document.getElementById('sec-form');
+            const btnToggle = document.getElementById('btn-toggle-view');
+
+            if (btnToggle) {
+                btnToggle.innerText = "Semak Tempahan";
+                btnToggle.setAttribute("onclick", "showCheck()");
+            }
+
+            // Langkah A: Mulakan fade-out skrin aktif
+            secCheck.classList.remove('show');
+            secForm.classList.remove('show');
+
+            setTimeout(() => {
+                secCheck.classList.add('hidden');
+                secForm.classList.add('hidden');
+                
+                secLanding.classList.remove('hidden');
+                secLanding.classList.add('fade-menu');
+                
+                setTimeout(() => {
+                    secLanding.classList.add('show');
+                }, 50);
+            }, 200);
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            resetBorangTempahan();
+        }
+
+        // 📝 3. UPGRADE: FUNGSI BUKA BORANG DENGAN SMOOTH FADE + LOGIK MIN TARIKH
+        function startBooking(nama) {
+            const secLanding = document.getElementById('sec-landing');
+            const secForm = document.getElementById('sec-form');
+
+            document.getElementById('display-fasiliti').innerText = nama;
+            
+            // Langkah A: Mula kesan fade-out pada skrin Landing
+            secLanding.classList.remove('show');
+
+            setTimeout(() => {
+                secLanding.classList.add('hidden');
+                
+                secForm.classList.remove('hidden');
+                secForm.classList.add('fade-menu');
+                
+                setTimeout(() => {
+                    secForm.classList.add('show');
+                }, 50);
+            }, 200);
+
+            // 🗓️ Logik Sekatan Tarikh Minimum Hari Ini & Hari Tamat Dinamik
+            const hariIni = new Date().toISOString().split('T')[0];
+            const inputMula = document.getElementById('t_mula');
+            const inputTamat = document.getElementById('t_akhir');
+            
+            if (inputMula && inputTamat) {
+                inputMula.setAttribute('min', hariIni);
+                inputTamat.setAttribute('min', hariIni);
+
+                inputMula.addEventListener('change', function() {
+                    const tarikhMulaPilihan = this.value;
+                    inputTamat.setAttribute('min', tarikhMulaPilihan);
+                    
+                    if (inputTamat.value && inputTamat.value < tarikhMulaPilihan) {
+                        inputTamat.value = '';
+                    }
+                });
+            }
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function openSheet(namaBilik) {
+            const sheet = document.getElementById('side-sheet');
+            const content = document.getElementById('sheet-content');
+            document.getElementById('sheet-subtitle').innerText = namaBilik;
+            
+            const hariIni = new Date();
+            hariIni.setHours(0, 0, 0, 0);
+
+            let list = allBookings.filter(b => {
+                if (b.Fasiliti !== namaBilik) return false;
+                
+                let cleanDate = b.Tarikh_Mula;
+                let tarikhTempahan;
+                
+                if (cleanDate.includes('T')) {
+                    tarikhTempahan = new Date(cleanDate);
+                } else {
+                    tarikhTempahan = new Date(cleanDate.split('/').reverse().join('-'));
+                }
+                
+                tarikhTempahan.setHours(0, 0, 0, 0);
+                return tarikhTempahan >= hariIni;
+            });
+            
+            let groupedBookings = {};
+            
+            list.forEach(b => {
+                let cleanDate = b.Tarikh_Mula;
+                if (cleanDate.includes('T')) {
+                    cleanDate = new Date(cleanDate).toLocaleDateString('ms-MY');
+                }
+                
+                let key = `${cleanDate}_${b.Nama_Program}`;
+                
+                if (!groupedBookings[key]) {
+                    groupedBookings[key] = {
+                        Tarikh: cleanDate,
+                        Nama_Program: b.Nama_Program,
+                        Nama_Pemohon: b.Nama_Pemohon,
+                        No_HP: b.No_HP,
+                        Organisasi: b.Organisasi,
+                        Slots: [b.Slot]
+                    };
+                } else {
+                    if (!groupedBookings[key].Slots.includes(b.Slot)) {
+                        groupedBookings[key].Slots.push(b.Slot);
+                    }
+                }
+            });
+
+            let finalList = Object.values(groupedBookings).sort((a, b) => {
+                const dateA = new Date(a.Tarikh.split('/').reverse().join('-'));
+                const dateB = new Date(b.Tarikh.split('/').reverse().join('-'));
+                return dateA - dateB;
+            });
+
+            content.innerHTML = finalList.length ? finalList.map(b => {
+                let sortedSlots = b.Slots.sort().join(', ');
+                
+                return `
+                <div class="group bg-white/80 p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] text-left border border-slate-100/50 shadow-sm hover:border-amber-200 transition-all cursor-pointer" onclick="this.classList.toggle('item-active')">
+                    <div class="flex justify-between items-start gap-2">
+                        <div class="w-11/12">
+                            <p class="text-amber-500 font-bold text-[9px] sm:text-[10px] uppercase tracking-wider">${b.Tarikh}</p>
+                            <h4 class="font-bold sm:font-extrabold text-slate-800 leading-tight text-sm sm:text-lg mt-0.5">${b.Nama_Program}</h4>
+                            <p class="text-slate-500 text-[10px] sm:text-xs font-semibold mt-1.5 bg-slate-100/80 inline-block px-2 py-0.5 sm:px-3 sm:py-1 rounded-lg border border-slate-200/50">⏰ Masa: ${sortedSlots}</p>
+                        </div>
+                        <div class="text-slate-300 group-hover:text-amber-500 transition-colors text-xs sm:text-sm pt-1">▼</div>
+                    </div>
+                    <div class="detail-content text-[11px] sm:text-xs space-y-1.5 text-slate-600">
+                        <p class="mt-2"><strong>👤 Pemohon:</strong> ${b.Nama_Pemohon}</p>
+                        <p><strong>📞 WhatsApp:</strong> ${b.No_HP || '-'}</p>
+                        <p><strong>🏛️ Organisasi:</strong> ${b.Organisasi}</p>
+                    </div>
+                </div>`;
+            }).join('') : `<p class="py-20 text-center text-slate-400 italic text-sm">Tiada tempahan aktif untuk bilik ini.</p>`;
+            
+            sheet.classList.add('open');
+            document.getElementById('overlay').classList.remove('hidden');
+            sheet.scrollTop = 0;
+        }
+
+        function closeSheet() { 
+            document.getElementById('side-sheet').classList.remove('open'); 
+            document.getElementById('overlay').classList.add('hidden'); 
+        }
+
+        function getColor(n) { 
+            const colors = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']; 
+            let hash = 0; 
+            for (let i = 0; i < n.length; i++) hash = n.charCodeAt(i) + ((hash << 5) - hash); 
+            return colors[Math.abs(hash) % colors.length]; 
+        }
+    </script>
+
+<footer class="fixed bottom-0 left-0 right-0 z-50 bg-gradient-to-t from-slate-950/80 to-transparent py-2 px-4 text-center">
+    <div class="max-w-6xl mx-auto flex flex-col items-center justify-center gap-y-0.5 font-medium tracking-wide">
+        
+        <p class="whitespace-nowrap text-[2.7vw] sm:text-[11px] text-slate-400">
+            &copy; 2026 <span class="text-white font-semibold">Unit Sumber Teknologi Pendidikan PPDPU</span> | PKGPU Smart Booking v1.0
+        </p>
+
+        <div class="flex items-center gap-1.5 text-[9px] sm:text-[10px] text-slate-300 font-mono">
+            <span class="w-1 h-1 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+            <span id="footer-live-clock">Memuatkan masa...</span>
+        </div>
+
+    </div>
+</footer>
+
+<script>
+// Fungsi Jam Live (Versi Eksekusi Terus)
+function mulakanJamLive() {
+    setInterval(() => {
+        const masaKini = new Date();
+        
+        const formatMasa = masaKini.toLocaleString('ms-MY', {
+            weekday: 'long', 
+            day: 'numeric', 
+            month: 'long', 
+            year: 'numeric',
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit',
+            hour12: true
+        });
+        
+        const elemenJam = document.getElementById('footer-live-clock');
+        if (elemenJam) {
+            elemenJam.innerText = formatMasa;
+        }
+    }, 1000);
+}
+
+// Terus jalankan fungsi
+mulakanJamLive();
+</script>
+</body>
+</html>
